@@ -13,16 +13,24 @@ def create_app(test_config=None):
 
     @app.route('/')
     def get_greeting():
-        # excited = 'false'
         excited = os.environ['EXCITED']
         greeting = "Hello"
         if excited == 'true':
             greeting = greeting + "!!!!!"
         return greeting
 
+
     @app.route('/coolkids')
     def be_cool():
         return "Be cool, man, be coooool! You're almost a FSND grad!"
+
+
+    @app.route('/test')
+    def test():
+        database_path = os.environ['DATABASE_URL']
+        excited = os.environ['EXCITED']
+        message = "Is this excited? " + excited + "\r\n Database URL: " + database_path
+        return message
 
     return app
 
