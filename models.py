@@ -42,7 +42,7 @@ def actor_features_in(actor_id):
     relationship = Related.query.filter_by(actor_id=actor_id).all()
     data = []
     for relation in relationship:
-        movie = Movie.query.filter_by(relation.movie_id).first()
+        movie = Movie.query.filter_by(id=relation.movie_id).first()
         relation = {
             "movie_id"  : relation.movie_id,
             "movie_name": movie.title,

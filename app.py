@@ -95,7 +95,7 @@ def create_app(test_config=None):
     @app.after_request
     def after_request(response):
         header = response.headers
-        header['Access-Control-Allow-Origin'] = 'localhost:8100'
+        header['Access-Control-Allow-Origin'] = '*'
         header[
             'Access-Control-Allow-Headers'] = 'Authorization, Content-Type, true'
         header[
