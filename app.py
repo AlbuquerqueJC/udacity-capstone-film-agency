@@ -173,8 +173,8 @@ def create_app(test_config=None):
 
     # Show all movies
     @app.route('/movies/', methods=['GET'])
-    @requires_auth("get:movies")
-    def show_movies(token):
+    # @requires_auth("get:movies")
+    def show_movies(): #token
         # List all of the movies
         movies = list(map(Movie.long, Movie.query.all()))
         result = {
@@ -185,8 +185,8 @@ def create_app(test_config=None):
 
     # Show all actors
     @app.route('/actors/', methods=['GET'])
-    @requires_auth("get:actors")
-    def show_actors(token):
+    # @requires_auth("get:actors")
+    def show_actors(): #token
         # List all of the actors
         actors = list(map(Actor.long, Actor.query.all()))
         result = {
@@ -214,7 +214,22 @@ def create_app(test_config=None):
             age = body.get('age', None)
             movies = body.get('movies', None)
 
-            if movies is not None:
+            print("Data for Insert Actor:")
+            print(body)
+
+            if not movies:
+                actor = Actor(name=name, gender=gender, age=age)
+                Actor.insert(actor)
+
+                new_actor = Actor.query.filter_by(id=actor.id).first()
+                print("New Actor:")
+                print(new_actor.long())
+
+                return jsonify({
+                    'success': True,
+                    'actors' : [new_actor.long()]
+                })
+            else:
                 movie_data = Movie.query.filter_by(id=movies).first()
                 print("Movie Data:")
                 print(movie_data.long())
@@ -238,20 +253,19 @@ def create_app(test_config=None):
                     'success': True,
                     'actors' : [new_actor.long()]
                 })
+            '''
+            actor = Actor(name=name, gender=gender, age=age)
+            Actor.insert(actor)
 
-            else:
-                actor = Actor(name=name, gender=gender, age=age)
-                Actor.insert(actor)
+            new_actor = Actor.query.filter_by(id=actor.id).first()
+            print("New Actor:")
+            print(new_actor.long())
 
-                new_actor = Actor.query.filter_by(id=actor.id).first()
-                print("New Actor:")
-                print(new_actor.long())
-
-                return jsonify({
-                    'success': True,
-                    'actors' : [new_actor.long()]
-                })
-
+            return jsonify({
+                'success': True,
+                'actors' : [new_actor.long()]
+            })
+            '''
         else:
             abort(422)
 
@@ -296,14 +310,17 @@ def create_app(test_config=None):
 
             relationship = Related.query.filter_by(
                 actor_id=actor_id).all()
-            if relationship is None:
+            print("Relationship")
+            print(relationship)
+
+            if not relationship:
                 print("No relationships to delete")
             else:
                 relationship.delete()
                 print("Deleted relationships")
 
             actor.delete()
-            print("Deleted actor: " + actor_id)
+            print("Deleted actor: ", actor_id)
 
             return jsonify({
                 'success': True,
@@ -323,14 +340,14 @@ def create_app(test_config=None):
 
             relationship = Related.query.filter_by(
                 movie_id=movie_id).all()
-            if relationship is None:
+            if not relationship:
                 print("No relationships to delete")
             else:
                 relationship.delete()
                 print("Deleted relationships")
 
             movie.delete()
-            print("Deleted movie: " + movie_id)
+            print("Deleted movie: ", movie_id)
 
             return jsonify({
                 'success': True,
@@ -360,6 +377,8 @@ def create_app(test_config=None):
         age = data.get('age', None)
         movies = data.get('movies', None)
 
+        print("Data for Update Actor:")
+        print(data)
         try:
             actor = Actor.query.filter_by(id=actor_id).one_or_none()
             if actor is None:
@@ -377,7 +396,10 @@ def create_app(test_config=None):
             if age is not None:
                 actor.age = age
 
+            '''
             if movies is not None:
+                if movies.id is not None:
+                    movies = movies.id
                 try:
                     movie_data = Movie.query.filter_by(id=movies).first()
                     print("Movie Data:")
@@ -393,6 +415,7 @@ def create_app(test_config=None):
                     print(new_relation.format())
                 except():
                     abort(404)
+            '''
 
             print(actor.short())
             Actor.update(actor)

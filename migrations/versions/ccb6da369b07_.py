@@ -70,8 +70,8 @@ def downgrade():
     sa.Column('name', sa.VARCHAR(length=128), autoincrement=False, nullable=False),
     sa.Column('age', sa.INTEGER(), autoincrement=False, nullable=False),
     sa.Column('gender', sa.VARCHAR(length=1), autoincrement=False, nullable=False),
-    sa.Column('movies', sa.INTEGER(), autoincrement=False, nullable=True),
-    sa.ForeignKeyConstraint(['movies'], ['movies_table.id'], name='actors_table_movies_fkey'),
+    sa.Column('movie_list', sa.INTEGER(), autoincrement=False, nullable=True),
+    sa.ForeignKeyConstraint(['movie_list'], ['movies_table.id'], name='actors_table_movies_fkey'),
     sa.PrimaryKeyConstraint('id', name='actors_table_pkey'),
     sa.UniqueConstraint('name', name='actors_table_name_key')
     )

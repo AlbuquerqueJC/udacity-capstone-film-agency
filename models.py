@@ -44,9 +44,9 @@ def actor_features_in(actor_id):
     for relation in relationship:
         movie = Movie.query.filter_by(id=relation.movie_id).first()
         relation = {
-            "movie_id"  : relation.movie_id,
-            "movie_name": movie.title,
-            "movie_year": movie.release_year
+            "id"            : relation.movie_id,
+            "title"         : movie.title,
+            "release_year"  : movie.release_year
         }
         data.append(relation)
     return data
@@ -59,10 +59,10 @@ def movie_actors(movie_id):
     for relation in relationship:
         actor = Actor.query.filter_by(id=relation.actor_id).first()
         relation = {
-            "actor_id"    : relation.actor_id,
-            "actor_name"  : actor.name,
-            "actor_gender": actor.gender,
-            "actor_age"   : actor.age
+            "id"    : relation.actor_id,
+            "name"  : actor.name,
+            "gender": actor.gender,
+            "age"   : actor.age
         }
         data.append(relation)
     return data
@@ -83,9 +83,9 @@ class Actor(db.Model):
     age = Column(Integer(), nullable=False)
     gender = Column(String(1), nullable=False)
     # Add movie as foreign key for actor model
-    # movies = db.relationship("movies", secondary=movie_actor_table,
+    # movie_list = db.relationship("movie_list", secondary=movie_actor_table,
     # back_populates="actors")
-    # movies = db.Column(db.Integer, db.ForeignKey('movies.id'), nullable=True)
+    # movie_list = db.Column(db.Integer, db.ForeignKey('movie_list.id'), nullable=True)
     related = db.relationship('Related', backref='actor', uselist=False,
                               passive_deletes=True)
 
@@ -119,11 +119,11 @@ class Actor(db.Model):
 
     def long(self):
         return {
-            'id'        : self.id,
-            'name'      : self.name,
-            'age'       : self.age,
-            'gender'    : self.gender,
-            'movie_list': actor_features_in(self.id)
+            'id'    : self.id,
+            'name'  : self.name,
+            'age'   : self.age,
+            'gender': self.gender,
+            'movies': actor_features_in(self.id)
         }
 
     '''
@@ -175,7 +175,6 @@ class Actor(db.Model):
 
     def update(self):
         try:
-            db.session.update(self)
             db.session.commit()
         except Exception as e:
             print({e})
@@ -201,13 +200,13 @@ class Movie(db.Model):
     title = Column(String(256), nullable=False, unique=True)
     release_year = Column(db.String(4), nullable=False)
     # Define parent-child relationship between the Movie and Actors
-    # actors = db.relationship("Actor", backref="movie_list",
-    # secondary=movie_actor_table, lazy=True, passive_deletes=True)
+    actors = db.relationship('Actor', secondary=Related, backref=db.backref(
+        'Related', lazy='joined'))
     related = db.relationship('Related', backref='movie', lazy=True,
                               passive_deletes=True)
 
     # actor_list = db.relationship("actors", secondary=movie_actor_table,
-    # back_populates="movies")
+    # back_populates="movie_list")
 
     def __init__(self, title, release_year):
         self.title = title
@@ -289,7 +288,6 @@ class Movie(db.Model):
 
     def update(self):
         try:
-            db.session.update(self)
             db.session.commit()
         except Exception as e:
             print({e})
