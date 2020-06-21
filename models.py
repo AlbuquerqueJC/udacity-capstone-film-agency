@@ -101,7 +101,8 @@ class Actor(db.Model):
             'id'    : self.id,
             'name'  : self.name,
             'age'   : self.age,
-            'gender': self.gender
+            'gender': self.gender,
+            'movies': actor_features_in(self.id)
         }
 
     '''
@@ -216,7 +217,8 @@ class Movie(db.Model):
         return {
             'id'          : self.id,
             'title'       : self.title,
-            'release_year': self.release_year
+            'release_year': self.release_year,
+            'actors'      : movie_actors(self.id)
         }
 
     '''

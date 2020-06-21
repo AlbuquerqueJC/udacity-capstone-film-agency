@@ -7,6 +7,9 @@ from flask_cors import CORS
 from models import setup_db, Movie, Actor, Related, format_datetime, db
 from auth.auth import AuthError, requires_auth
 
+ROWS_PER_PAGE = 5
+data = []
+
 
 def create_app(test_config=None):
     # create and configure the app
@@ -89,6 +92,25 @@ def create_app(test_config=None):
         print("Movie return: ", movie)
         return movie_choices
 
+    def paginate_results(request, selection):
+        '''Paginates and formats database queries
+        Parameters:
+          * <HTTP object> request, that may contain a "page" value
+          * <database selection> selection of objects, queried from database
+        Returns:
+          * <list> list of dictionaries of objects, max. 10 objects
+        '''
+        # Get page from request. If not given, default to 1
+        page = request.args.get('page', 1, type=int)
+
+        # Calculate start and end slicing
+        start = (page - 1) * ROWS_PER_PAGE
+        end = start + ROWS_PER_PAGE
+
+        # Format selection into list of dicts and return sliced
+        objects_formatted = [object_name.format() for object_name in selection]
+        return objects_formatted[start:end]
+
     # ----------------------------------------------------------------------------#
     # Filters.
     # ----------------------------------------------------------------------------#
@@ -121,14 +143,15 @@ def create_app(test_config=None):
     def relations():
         # displays list of relationship between Actors and Movies
         relationship = Related.query.all()
-        data = []
-        for relation in relationship:
+        paginated_relationship = paginate_results(request, relationship)
+
+        for relation in paginated_relationship:
             relation = {
-                "movie_id"        : relation.movie_id,
-                "movie_name"      : Movie.query.get(relation.movie_id).title,
-                "actor_id"        : relation.actor_id,
-                "actor_name"      : Actor.query.get(relation.actor_id).name,
-                "actor_gender"    : Actor.query.get(relation.actor_id).gender
+                "movie_id"        : relation['movie_id'],
+                "movie_name"      : Movie.query.get(relation['movie_id']).title,
+                "actor_id"        : relation['actor_id'],
+                "actor_name"      : Actor.query.get(relation['actor_id']).name,
+                "actor_gender"    : Actor.query.get(relation['actor_id']).gender
             }
             data.append(relation)
 
@@ -157,9 +180,9 @@ def create_app(test_config=None):
             Movie.title).all()
         new_movie_choices = {}
         movies = []
-        for movie_choice in movie_choices:
-            id = movie_choice[0]
-            title = movie_choice[1]
+        for movie in movies:
+            id = movie[0]
+            title = movie[1]
             new_title = 'ID: ' + str(id) + ' - ' + title
             new_movie_choices[id] = new_title
         movies = list(new_movie_choices.items())
@@ -176,10 +199,12 @@ def create_app(test_config=None):
     # @requires_auth("get:movies")
     def show_movies(): #token
         # List all of the movies
-        movies = list(map(Movie.long, Movie.query.all()))
+        selection = Movie.query.all()
+        paginated_movies = paginate_results(request, selection)
+        # movies = list(map(Movie.long, paginated_movies))
         result = {
             'success': True,
-            'movies' : movies
+            'movies' : paginated_movies
         }
         return jsonify(result)
 
@@ -188,11 +213,17 @@ def create_app(test_config=None):
     # @requires_auth("get:actors")
     def show_actors(): #token
         # List all of the actors
-        actors = list(map(Actor.long, Actor.query.all()))
-        result = {
-            'success': True,
-            'actors' : actors
-        }
+        selection = Actor.query.all()
+        paginated_actors = paginate_results(request, selection)
+        # actors = list(map(Actor.long, paginated_actors))
+
+        if not paginated_actors:
+            abort(404)
+        else:
+            result = {
+                'success': True,
+                'actors' : paginated_actors
+            }
         return jsonify(result)
 
     '''
@@ -491,7 +522,7 @@ def create_app(test_config=None):
         }), 422
 
     @app.errorhandler(404)
-    def unprocessable(error):
+    def not_found(error):
         return jsonify({
             "success": False,
             "error"  : 404,
@@ -499,12 +530,12 @@ def create_app(test_config=None):
         }), 404
 
     @app.errorhandler(401)
-    def unprocessable(error):
+    def unauthorized(error):
         return jsonify({
             "success"    : False,
             "error"      : 401,
             "message"    : "Unauthorized",
-            "description": "The server could not verify that you are authorized!"
+            "description": "The server could not verify that you're authorized!"
         }), 401
 
     '''
@@ -512,10 +543,12 @@ def create_app(test_config=None):
     '''
 
     @app.errorhandler(AuthError)
-    def handle_auth_error(exception):
-        response = jsonify(exception.error)
-        response.status_code = exception.status_code
-        return response
+    def authentication_failed(AuthError):
+        return jsonify({
+            "success": False,
+            "error"  : AuthError.status_code,
+            "message": AuthError.error['description']
+        }), AuthError.status_code
 
     # ----------------------------------------------------------------------------#
     # Return app
