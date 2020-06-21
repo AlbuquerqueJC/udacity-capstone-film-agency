@@ -200,8 +200,8 @@ class Movie(db.Model):
     title = Column(String(256), nullable=False, unique=True)
     release_year = Column(db.String(4), nullable=False)
     # Define parent-child relationship between the Movie and Actors
-    actors = db.relationship('Actor', secondary=Related, backref=db.backref(
-        'Related', lazy='joined'))
+    # actors = db.relationship('Actor', secondary=Related, backref=db.backref(
+    #    'Related', lazy='joined'))
     related = db.relationship('Related', backref='movie', lazy=True,
                               passive_deletes=True)
 
