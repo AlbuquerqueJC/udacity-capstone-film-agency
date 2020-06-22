@@ -1,10 +1,9 @@
-import json
 import os
 
 from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from models import setup_db, Movie, Actor, Related, format_datetime, db
+from models import setup_db, Movie, Actor, Related, db, db_drop_and_create_all
 from auth.auth import AuthError, requires_auth
 
 ROWS_PER_PAGE = 5
@@ -17,89 +16,34 @@ def create_app(test_config=None):
     setup_db(app)
     CORS(app)
 
+    # Uncomment to re-initialize DB and create test records.
+    # db_drop_and_create_all()
+
     #
     # Helpers.
     #
-    def relationships():
-        # displays list of relationships between Actors and Movies
-        relationship = Related.query.all()
-        data = []
-        for relation in relationship:
-            relation = {
-                "movie_id"        : relation.movie_id,
-                "movie_name"      : Movie.query.get(relation.movie_id).title,
-                "actor_id"        : relation.actor_id,
-                "actor_name"      : Actor.query.get(relation.actor_id).name,
-                "actor_gender"    : Actor.query.get(relation.actor_id).gender
-            }
-            data.append(relation)
-        return data
-
-    def actor_appears_in(actor_id):
-        # displays list of relationships between Actors and Movies
-        relationship = Related.query.filter_by(actor_id=actor_id).all()
-        data = []
-        for relation in relationship:
-            relation = {
-                "movie_id"        : relation.movie_id,
-                "movie_name"      : Movie.query.get(relation.movie_id).title,
-                "actor_id"        : relation.actor_id,
-                "actor_name"      : Actor.query.get(relation.actor_id).name,
-                "actor_gender"    : Actor.query.get(relation.actor_id).gender
-            }
-            data.append(relation)
-        return data
-
-    def actor_choices():
-        # Adding the ID to the name in selectField
-        choices = db.session.query(Actor.id, Actor.name).order_by(
-            Actor.name).all()
-        actor_choices = {}
-        actors = []
-        for choice in choices:
-            id = choice[0]
-            name = choice[1]
-            new_name = 'ID: ' + str(id) + ' - ' + name
-            actor_choices[id] = new_name
-        actors = list(actor_choices.items())
-        return actors
-
-    def movie_choices():
-        # Adding the ID to the name in selectField
-        movie_choices = db.session.query(Movie.id, Movie.title).order_by(
-            Movie.title).all()
-        new_movie_choices = {}
-        movies = []
-        for movie_choice in movie_choices:
-            id = movie_choice[0]
-            title = movie_choice[1]
-            new_title = 'ID: ' + str(id) + ' - ' + title
-            new_movie_choices[id] = new_title
-        movies = list(new_movie_choices.items())
-        return movies
-
-    def movie_choice(chosen_movie_id):
-        # Adding the ID to the name in selectField
-        movie_choices = db.session.query(Movie.id, Movie.title).order_by(
-            Movie.title).filter_by(id=chosen_movie_id).first()
-        new_movie_choice = {}
-        movie = ()
-        print("Movie Choices: ", movie_choices)
-        id = movie_choices[0]
-        title = movie_choices[1]
-        new_movie_choice[id] = title
-        movie = list(new_movie_choice.items())
-        print("Movie return: ", movie)
-        return movie_choices
+    def diff(first, second):
+        """
+        Calculated difference between two arrays
+        Parameters:
+          * An array [1,2,3,4]
+          * Another array [2,5]
+        Returns:
+          * <array> difference of first array excluding the items from second
+          array.
+        """
+        second = set(second)
+        return [item for item in first if item not in second]
 
     def paginate_results(request, selection):
-        '''Paginates and formats database queries
+        """
+        Paginates and formats database queries
         Parameters:
           * <HTTP object> request, that may contain a "page" value
           * <database selection> selection of objects, queried from database
         Returns:
-          * <list> list of dictionaries of objects, max. 10 objects
-        '''
+          * <list> list of dictionaries of objects limit set by ROWS_PER_PAGE
+        """
         # Get page from request. If not given, default to 1
         page = request.args.get('page', 1, type=int)
 
@@ -111,22 +55,24 @@ def create_app(test_config=None):
         objects_formatted = [object_name.format() for object_name in selection]
         return objects_formatted[start:end]
 
-    # ----------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     # Filters.
-    # ----------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     @app.after_request
     def after_request(response):
         header = response.headers
         header['Access-Control-Allow-Origin'] = '*'
         header[
-            'Access-Control-Allow-Headers'] = 'Authorization, Content-Type, true'
+            'Access-Control-Allow-Headers'] = 'Authorization, Content-Type, ' \
+                                              'true '
         header[
-            'Access-Control-Allow-Methods'] = 'POST,GET,PUT,DELETE,PATCH,OPTIONS'
+            'Access-Control-Allow-Methods'] = 'POST,GET,PUT,DELETE,PATCH,' \
+                                              'OPTIONS '
         return response
 
-    # ----------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     # Routes.
-    # ----------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     @app.route('/')
     def get_greeting():
         excited = os.environ['EXCITED']
@@ -137,50 +83,83 @@ def create_app(test_config=None):
         # return render_template('pages/home.html')
         return greeting
 
-    #  RelationShip Tests
+    #  RelationShip Views
     #  ----------------------------------------------------------------
-    @app.route('/relations')
-    def relations():
+    @app.route('/relationships')
+    def show_relationships():
         # displays list of relationship between Actors and Movies
         relationship = Related.query.all()
+        print(relationship)
         paginated_relationship = paginate_results(request, relationship)
+
+        if not paginated_relationship:
+            abort(404, {'message': 'No relationships to list'})
 
         for relation in paginated_relationship:
             relation = {
-                "movie_id"        : relation['movie_id'],
-                "movie_name"      : Movie.query.get(relation['movie_id']).title,
-                "actor_id"        : relation['actor_id'],
-                "actor_name"      : Actor.query.get(relation['actor_id']).name,
-                "actor_gender"    : Actor.query.get(relation['actor_id']).gender
+                "id"          : relation['id'],
+                "movie_id"    : relation['movie_id'],
+                "movie_name"  : Movie.query.get(relation['movie_id']).title,
+                "actor_id"    : relation['actor_id'],
+                "actor_name"  : Actor.query.get(relation['actor_id']).name,
+                "actor_gender": Actor.query.get(relation['actor_id']).gender
             }
             data.append(relation)
 
         result = {
             'success'      : True,
-            'relationship' : data
+            'relationships': data
         }
         return jsonify(result)
 
-    @app.route('/relationships', methods=['GET'])
-    def relationships():
-        # Adding the ID to the name in selectField
-        choices = db.session.query(Actor.id, Actor.name).order_by(
+    # Delete Relationship
+    @app.route('/relationships/<relationship_id>', methods=['DELETE'])
+    @requires_auth('delete:actor')
+    def delete_relationship(token, relationship_id):
+        try:
+            if not relationship_id:
+                abort(400, {
+                    'message': 'please add relationship id to the request '
+                               'url.'
+                })
+
+            relation = Related.query.filter_by(id=relationship_id).one_or_none()
+            if not relation:
+                abort(404, {
+                    'message': 'Relationship with id {} not found '
+                               'in '
+                               'database.'
+                      .format(relationship_id)
+                })
+
+            relation.delete()
+            print("Deleted relationship: ", relationship_id)
+
+            return jsonify({
+                'success': True,
+                'deleted': relationship_id
+            })
+        except():
+            abort(422)
+
+    @app.route('/relations', methods=['GET'])
+    def relations():
+        # Adding the ID to the name for Select Field
+        actor_options = db.session.query(Actor.id, Actor.name).order_by(
             Actor.name).all()
         actor_choices = {}
-        actors = []
-        for choice in choices:
+        for choice in actor_options:
             id = choice[0]
             name = choice[1]
             new_name = 'ID: ' + str(id) + ' - ' + name
             actor_choices[id] = new_name
         actors = list(actor_choices.items())
 
-        # Adding the ID to the name in selectField
-        movie_choices = db.session.query(Movie.id, Movie.title).order_by(
+        # Adding the ID to the name for Select Field
+        movie_options = db.session.query(Movie.id, Movie.title).order_by(
             Movie.title).all()
         new_movie_choices = {}
-        movies = []
-        for movie in movies:
+        for movie in movie_options:
             id = movie[0]
             title = movie[1]
             new_title = 'ID: ' + str(id) + ' - ' + title
@@ -188,42 +167,46 @@ def create_app(test_config=None):
         movies = list(new_movie_choices.items())
 
         result = {
-            'success'       : True,
-            'movie_choices' : movies,
-            'actor_choices' : actors
+            'success'      : True,
+            'movie_choices': movies,
+            'actor_choices': actors
         }
         return jsonify(result)
 
-    # Show all movies
+    #  Movies Views
+    #  ----------------------------------------------------------------
     @app.route('/movies/', methods=['GET'])
-    # @requires_auth("get:movies")
-    def show_movies(): #token
+    @requires_auth("get:movies")
+    def show_movies(token):  # token
         # List all of the movies
         selection = Movie.query.all()
         paginated_movies = paginate_results(request, selection)
-        # movies = list(map(Movie.long, paginated_movies))
+
+        if not paginated_movies:
+            abort(404, {'message': 'No movies to list'})
+
         result = {
             'success': True,
             'movies' : paginated_movies
         }
         return jsonify(result)
 
-    # Show all actors
+    #  Actor Views
+    #  ----------------------------------------------------------------
     @app.route('/actors/', methods=['GET'])
-    # @requires_auth("get:actors")
-    def show_actors(): #token
+    @requires_auth("get:actors")
+    def show_actors(token):  # token
         # List all of the actors
         selection = Actor.query.all()
         paginated_actors = paginate_results(request, selection)
-        # actors = list(map(Actor.long, paginated_actors))
 
         if not paginated_actors:
-            abort(404)
-        else:
-            result = {
-                'success': True,
-                'actors' : paginated_actors
-            }
+            abort(404, {'message': 'No actors to list'})
+
+        result = {
+            'success': True,
+            'actors' : paginated_actors
+        }
         return jsonify(result)
 
     '''
@@ -235,7 +218,8 @@ def create_app(test_config=None):
             where actor is an array containing only the newly created actor
             or appropriate status code indicating reason for failure
     '''
-    @app.route('/actor', methods=['POST'])
+
+    @app.route('/actors', methods=['POST'])
     @requires_auth('post:actor')
     def add_actor(token):
         if request.data:
@@ -245,46 +229,21 @@ def create_app(test_config=None):
             age = body.get('age', None)
             movies = body.get('movies', None)
 
-            print("Data for Insert Actor:")
-            print(body)
-
-            if not movies:
-                actor = Actor(name=name, gender=gender, age=age)
-                Actor.insert(actor)
-
-                new_actor = Actor.query.filter_by(id=actor.id).first()
-                print("New Actor:")
-                print(new_actor.long())
-
-                return jsonify({
-                    'success': True,
-                    'actors' : [new_actor.long()]
-                })
+            if not body:
+                abort(400, {'message': 'please provide JSON.'})
             else:
-                movie_data = Movie.query.filter_by(id=movies).first()
-                print("Movie Data:")
-                print(movie_data.long())
-                actor = Actor(name=name, gender=gender, age=age)
-                Actor.insert(actor)
+                print("Data for Insert Actor:")
+                print(body)
 
-                new_actor = Actor.query.filter_by(id=actor.id).first()
-                print("New Actor:")
-                print(new_actor.long())
+            if not name:
+                abort(422, {'message': 'no name provided.'})
 
-                # Add relationship to Related table
-                relation = Related(movie_id=movie_data.id,
-                                   actor_id=new_actor.id)
-                Related.insert(relation)
+            if not age:
+                abort(422, {'message': 'no age provided.'})
 
-                new_relation = Related.query.filter_by(id=relation.id).first()
-                print("New Relation")
-                print(new_relation.format())
+            if not gender:
+                abort(422, {'message': 'no gender provided.'})
 
-                return jsonify({
-                    'success': True,
-                    'actors' : [new_actor.long()]
-                })
-            '''
             actor = Actor(name=name, gender=gender, age=age)
             Actor.insert(actor)
 
@@ -292,22 +251,55 @@ def create_app(test_config=None):
             print("New Actor:")
             print(new_actor.long())
 
+            # Handling movie relationships
+            if movies:
+                # We add a relationship between actor and the movie(s)
+                # Iterate through movie_ids in movies
+                list_of_movies = []
+                for movie in movies:
+                    movie_data = Movie.query.filter_by(id=movie).one_or_none()
+                    if not movie_data:
+                        abort(422, {
+                            'message': 'movie {} not found'.format(
+                                movie)
+                        })
+
+                    # add this movie to list_of_movies
+                    list_of_movies.append(movie_data.short())
+
+                    # Add relationship to Related table
+                    relation = Related(movie_id=movie_data.id,
+                                       actor_id=new_actor.id)
+                    relation.insert()
+
+                    new_relation = Related.query.filter_by(
+                        id=relation.id).first()
+                    print("New Relation")
+                    print(new_relation.format())
+
+                print("List of movies", list_of_movies)
+
             return jsonify({
                 'success': True,
-                'actors' : [new_actor.long()]
+                'actor'  : [new_actor.long()]
             })
-            '''
         else:
             abort(422)
 
     # Post Movie
-    @app.route('/movie', methods=['POST'])
+    @app.route('/movies', methods=['POST'])
     @requires_auth('post:movie')
     def add_movie(token):
         if request.data:
             body = request.get_json()
             title = body.get('title', None)
             release_year = body.get('release_year', None)
+
+            if not title:
+                abort(422, {'message': 'no title provided.'})
+
+            if not release_year:
+                abort(422, {'message': 'no release_year provided.'})
 
             movie = Movie(title=title, release_year=release_year)
             Movie.insert(movie)
@@ -322,7 +314,7 @@ def create_app(test_config=None):
             abort(422)
 
     '''
-        DELETE /actor/<id>
+        DELETE /actors/<id>
             where <id> is the existing model id
             it should respond with a 404 error if <id> is not found
             it should delete the corresponding row for <id>
@@ -331,24 +323,33 @@ def create_app(test_config=None):
             id is the id of the deleted record or appropriate status code 
             indicating reason for failure
     '''
-    @app.route('/actor/<int:actor_id>', methods=['DELETE'])
+
+    @app.route('/actors/<int:actor_id>', methods=['DELETE'])
     @requires_auth('delete:actor')
     def delete_actor(token, actor_id):
         try:
+            if not actor_id:
+                abort(400, {
+                    'message': 'please add actor id to the request url.'
+                })
+
             actor = Actor.query.filter_by(id=actor_id).one_or_none()
-            if actor is None:
-                abort(404)
+            if not actor:
+                abort(404, {
+                    'message': 'Actor with id {} not found in '
+                               'database.'.format(actor_id)
+                })
 
             relationship = Related.query.filter_by(
                 actor_id=actor_id).all()
-            print("Relationship")
-            print(relationship)
 
             if not relationship:
-                print("No relationships to delete")
+                print("No relationships to delete for actor_id:", actor_id)
             else:
-                relationship.delete()
-                print("Deleted relationships")
+                for relation in relationship:
+                    relation.delete()
+                    print("Deleted relationship movie {} for actor_id:".format(
+                        relation.movie_id), actor_id)
 
             actor.delete()
             print("Deleted actor: ", actor_id)
@@ -361,21 +362,30 @@ def create_app(test_config=None):
             abort(422)
 
     # Delete Movie
-    @app.route('/movie/<int:movie_id>', methods=['DELETE'])
+    @app.route('/movies/<int:movie_id>', methods=['DELETE'])
     @requires_auth('delete:movie')
     def delete_movie(token, movie_id):
         try:
-            movie = Movie.query.filter_by(id=movie_id).one_or_none()
-            if movie is None:
-                abort(404)
+            if not movie_id:
+                abort(400, {
+                    'message': 'please add movie id to the request url.'
+                })
 
-            relationship = Related.query.filter_by(
-                movie_id=movie_id).all()
+            movie = Movie.query.filter_by(id=movie_id).one_or_none()
+            if not movie:
+                abort(404, {
+                    'message': 'Movie with id {} not found in '
+                               'database.'
+                      .format(movie_id)
+                })
+
+            relationship = Related.query.filter_by(movie_id=movie_id).all()
+
             if not relationship:
-                print("No relationships to delete")
+                print("No relationships to delete for movie_id:", movie_id)
             else:
                 relationship.delete()
-                print("Deleted relationships")
+                print("Deleted relationships for movie_id:", movie_id)
 
             movie.delete()
             print("Deleted movie: ", movie_id)
@@ -387,9 +397,8 @@ def create_app(test_config=None):
         except():
             abort(422)
 
-
     '''
-        PATCH /actor/<id>
+        PATCH /actors/<id>
             where <id> is the existing model id
             it should respond with a 404 error if <id> is not found
             it should update the corresponding row for <id>
@@ -399,23 +408,38 @@ def create_app(test_config=None):
             where actor is an array containing only the updated actor
             or appropriate status code indicating reason for failure
     '''
-    @app.route('/actor/<int:actor_id>', methods=['PATCH'])
+
+    @app.route('/actors/<int:actor_id>', methods=['PATCH'])
     @requires_auth('patch:actor')
     def patch_actor(token, actor_id):
-        data = request.get_json()
-        name = data.get('name', None)
-        gender = data.get('gender', None)
-        age = data.get('age', None)
-        movies = data.get('movies', None)
+        body = request.get_json()
+        name = body.get('name', None)
+        gender = body.get('gender', None)
+        age = body.get('age', None)
+        movies = body.get('movies', None)
 
-        print("Data for Update Actor:")
-        print(data)
+        if not body:
+            abort(400, {
+                'message': 'at least one field needs to be changed.'
+            })
+        else:
+            print("Data for Update Actor:")
+            print(body)
+
+        if not name and not age and not gender and not movies:
+            abort(400, {
+                'message': 'at least one field needs to be changed.'
+            })
+
         try:
             actor = Actor.query.filter_by(id=actor_id).one_or_none()
-            if actor is None:
-                abort(404)
+            if not actor:
+                abort(404, {
+                    'message': 'Actor with id {} not found in '
+                               'database.'.format(actor_id)
+                })
             else:
-                print("Update For Actor:")
+                print("Update For Actor:", actor_id)
                 print(actor.short())
 
             if name is not None:
@@ -427,41 +451,71 @@ def create_app(test_config=None):
             if age is not None:
                 actor.age = age
 
-            '''
-            if movies is not None:
-                if movies.id is not None:
-                    movies = movies.id
-                try:
-                    movie_data = Movie.query.filter_by(id=movies).first()
-                    print("Movie Data:")
-                    print(movie_data.short())
+            # Handling movie relationships
+            list_of_movies = []
+            list_of_movies_to_add = []
+            already_exist_movies = []
+            if movies:
+                # We check existing relationship between actor and the movie(s)
+                already_related_movies = Related.query.filter_by(
+                    actor_id=actor_id).all()
+                # Iterate through movie_ids in already_related_movies and
+                # save to array
+                for related_movie in already_related_movies:
+                    already_exist_movies.append(related_movie.movie_id)
 
-                    # Add relationship to Related table
-                    relation = Related(movie_id=movie_data.id,
-                                       actor_id=actor.id)
-                    Related.insert(relation)
+                print("Already Exists movies - Relationship already exists:",
+                      already_exist_movies)
+                # Check difference of movies to add vs already existing
+                list_of_movies_to_add = diff(movies, already_exist_movies)
+                print("Difference of already-exists-movies and movies is:",
+                      list_of_movies_to_add)
 
-                    new_relation = Related.query.filter_by(id=relation.id).first()
-                    print("New Relation")
-                    print(new_relation.format())
-                except():
-                    abort(404)
-            '''
+                if not list_of_movies_to_add:
+                    print("No movies to update")
+                else:
+                    for movie in list_of_movies_to_add:
+                        movie_data = Movie.query.filter_by(id=movie).one_or_none()
+                        if not movie_data:
+                            abort(422, {
+                                'message': 'movie {} not found'.format(
+                                    movie)
+                            })
 
-            print(actor.short())
-            Actor.update(actor)
+                        # add this movie to list_of_movies
+                        list_of_movies.append(movie_data.short())
 
-            updated_actor = Actor.query.filter_by(id=actor_id).first()
+                        # Add relationship to Related table
+                        relation = Related(movie_id=movie_data.id,
+                                           actor_id=actor_id)
+                        relation.insert()
 
-            return jsonify({
-                'success': True,
-                'actors' : [updated_actor.long()]
-            })
+                        print("New Relation")
+                        print(relation.format())
+                        print("List of movies", list_of_movies)
+
+            if age or gender or name is not None:
+                Actor.update(actor)
+                updated_actor = Actor.query.filter_by(id=actor_id).first()
+                print(updated_actor.long())
+                return jsonify({
+                    'success': True,
+                    'actors' : [updated_actor.long()]
+                })
+            elif not list_of_movies_to_add:
+                abort(400, {
+                    'message': 'at least one field needs to be changed.'
+                })
+            else:
+                return jsonify({
+                    'success': True,
+                    'actors' : [actor.long()]
+                })
         except():
             abort(422)
 
     # PATCH MODIFY Movie
-    @app.route('/movie/<int:movie_id>', methods=['PATCH'])
+    @app.route('/movies/<int:movie_id>', methods=['PATCH'])
     @requires_auth('patch:movie')
     def patch_movie(token, movie_id):
         data = request.get_json()
@@ -469,10 +523,27 @@ def create_app(test_config=None):
         release_year = data.get('release_year', None)
         actors = data.get('actors', None)
 
+        if not data:
+            abort(400, {
+                'message': 'at least one field needs to be changed.'
+            })
+        else:
+            print("Data for Update Movie:")
+            print(data)
+
+        if not title and not release_year:
+            abort(400, {
+                'message': 'at least one field needs to be changed.'
+            })
+
         try:
             movie = Movie.query.filter_by(id=movie_id).one_or_none()
-            if movie is None:
-                abort(404)
+            if not movie:
+                abort(404, {
+                    'message': 'Movie with id {} not found in '
+                               'database.'
+                      .format(movie_id)
+                })
 
             if title is not None:
                 movie.title = title
@@ -480,8 +551,9 @@ def create_app(test_config=None):
             if release_year is not None:
                 movie.release_year = release_year
 
-            if actors is not None:
-                movie.actors = actors
+            # TODO: Add ability to modify actors featuring in by movie_id
+            # if actors is not None:
+            #     movie.actors = actors
 
             print(movie.format())
             Movie.update(movie)
@@ -492,55 +564,74 @@ def create_app(test_config=None):
                 'success': True,
                 'actors' : [updated_movie.short()]
             })
-        except:
+        except():
             abort(422)
 
     @app.route('/coolkids')
     def be_cool():
         return "Be cool, man, be coooool! You're almost a FSND grad!"
 
-    @app.route('/test')
-    def test():
-        database_path = os.environ['DATABASE_URL']
-        excited = os.environ['EXCITED']
-        message = "Is this excited? " + excited + "\r\n Database URL: " + database_path
-        return message
-
-    # ----------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     # Error Handling
-    # ----------------------------------------------------------------------------#
-    '''
-    unprocessable entity
-    '''
+    # -------------------------------------------------------------------------#
+    def get_error_message(error, default_text):
+        """
+        Returns default error text or custom error message (if not applicable)
+        *Input:
+            * <error> system generated error message containing a description
+            message
+            * <string> default text to be used if Error has no specific message
+        *Output:
+            * <string> specific error message or default text (if no message)
+        """
+        try:
+            # Return message contained in error
+            return error.description['message']
+        except():
+            # else return default
+            return default_text
 
     @app.errorhandler(422)
-    def unprocessable(error):
+    def unprocessable(error, description="unprocessable"):
         return jsonify({
             "success": False,
             "error"  : 422,
-            "message": "unprocessable"
+            "message": get_error_message(error, "unprocessable!")
         }), 422
 
     @app.errorhandler(404)
-    def not_found(error):
+    def not_found(error, description="resource not found"):
         return jsonify({
             "success": False,
             "error"  : 404,
-            "message": "resource not found"
+            "message": get_error_message(error, "resource not found!")
         }), 404
 
+    @app.errorhandler(400)
+    def bad_request(error, description="bad request"):
+        return jsonify({
+            "success": False,
+            "error"  : 400,
+            "message": get_error_message(error, "bad request")
+        }), 400
+
     @app.errorhandler(401)
-    def unauthorized(error):
+    def unauthorized(error, description="Unauthorized!"):
         return jsonify({
             "success"    : False,
             "error"      : 401,
             "message"    : "Unauthorized",
-            "description": "The server could not verify that you're authorized!"
+            "description": get_error_message(error, "Unauthorized!")
         }), 401
 
     '''
-    error handler for AuthError 
-    '''
+    @app.errorhandler(500)
+    def internal_error(error):
+        return jsonify({
+            "success": False,
+            "error"  : 500,
+            "message": get_error_message(error, "Internal Server Error")
+        }), 500'''
 
     @app.errorhandler(AuthError)
     def authentication_failed(AuthError):
@@ -550,9 +641,9 @@ def create_app(test_config=None):
             "message": AuthError.error['description']
         }), AuthError.status_code
 
-    # ----------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     # Return app
-    # ----------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     return app
 
 

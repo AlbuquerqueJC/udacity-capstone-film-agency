@@ -2,7 +2,7 @@ import os
 
 import babel
 import dateutil.parser
-from sqlalchemy import Column, String, Integer, create_engine
+from sqlalchemy import Column, String, Integer
 from flask_sqlalchemy import SQLAlchemy
 import json
 
@@ -26,6 +26,78 @@ def setup_db(app, database_path=database_path):
 def db_drop_and_create_all():
     db.drop_all()
     db.create_all()
+    db_init_records()
+
+
+def db_init_records():
+    """Initialize the database with some records."""
+    new_actor = (Actor(
+        name='Joao Albuquerque',
+        gender='M',
+        age=38
+    ))
+
+    new_actor_girl = (Actor(
+        name='April Albuquerque',
+        gender='F',
+        age=24
+    ))
+
+    new_actor_boy = (Actor(
+        name='Jonathan Albuquerque',
+        gender='M',
+        age=26
+    ))
+
+    new_movie = (Movie(
+        title='Joao is Amazing',
+        release_year='1981'
+    ))
+
+    new_movie_girl = (Movie(
+        title='Awesome April',
+        release_year='2012'
+    ))
+
+    new_movie_boy = (Movie(
+        title='The life of Jonathan',
+        release_year='2010'
+    ))
+
+    new_movie_boy_and_girl = (Movie(
+        title='Brother and Sister Code',
+        release_year='2020'
+    ))
+
+    # Main and my movie
+    new_actor.insert()
+    new_movie.insert()
+    Related(movie_id=new_movie.id, actor_id=new_actor.id).insert()
+    # Girl and her movie
+    new_actor_girl.insert()
+    new_movie_girl.insert()
+    Related(
+        movie_id=new_movie_girl.id,
+        actor_id=new_actor_girl.id
+    ).insert()
+    # Boy and his movie
+    new_actor_boy.insert()
+    new_movie_boy.insert()
+    Related(
+        movie_id=new_movie_boy.id,
+        actor_id=new_actor_boy.id
+    ).insert()
+    # Girl and Boy Movie
+    new_movie_boy_and_girl.insert()
+    Related(
+        movie_id=new_movie_boy_and_girl.id,
+        actor_id=new_actor_boy.id
+    ).insert()
+    Related(
+        movie_id=new_movie_boy_and_girl.id,
+        actor_id=new_actor_girl.id
+    ).insert()
+    db.session.commit()
 
 
 def format_datetime(value, format='medium'):
