@@ -10,6 +10,7 @@ ROWS_PER_PAGE = 5
 data = []
 
 
+# Create our app
 def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__)
@@ -126,9 +127,7 @@ def create_app(test_config=None):
             relation = Related.query.filter_by(id=relationship_id).one_or_none()
             if not relation:
                 abort(404, {
-                    'message': 'Relationship with id {} not found '
-                               'in '
-                               'database.'
+                    'message': 'Relationship with id {} not found in database.'
                       .format(relationship_id)
                 })
 
@@ -230,7 +229,10 @@ def create_app(test_config=None):
             movies = body.get('movies', None)
 
             if not body:
-                abort(400, {'message': 'please provide JSON.'})
+                abort(400, {
+                    'message': 'request does not contain a valid JSON '
+                               'body.'
+                })
             else:
                 print("Data for Insert Actor:")
                 print(body)
@@ -475,7 +477,8 @@ def create_app(test_config=None):
                     print("No movies to update")
                 else:
                     for movie in list_of_movies_to_add:
-                        movie_data = Movie.query.filter_by(id=movie).one_or_none()
+                        movie_data = Movie.query.filter_by(
+                            id=movie).one_or_none()
                         if not movie_data:
                             abort(422, {
                                 'message': 'movie {} not found'.format(
@@ -518,18 +521,18 @@ def create_app(test_config=None):
     @app.route('/movies/<int:movie_id>', methods=['PATCH'])
     @requires_auth('patch:movie')
     def patch_movie(token, movie_id):
-        data = request.get_json()
-        title = data.get('title', None)
-        release_year = data.get('release_year', None)
-        actors = data.get('actors', None)
+        body = request.get_json()
+        title = body.get('title', None)
+        release_year = body.get('release_year', None)
+        actors = body.get('actors', None)
 
-        if not data:
+        if not body:
             abort(400, {
-                'message': 'at least one field needs to be changed.'
+                'message': 'request does not contain a valid JSON body.'
             })
         else:
             print("Data for Update Movie:")
-            print(data)
+            print(body)
 
         if not title and not release_year:
             abort(400, {
