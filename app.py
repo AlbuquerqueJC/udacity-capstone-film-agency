@@ -128,7 +128,7 @@ def create_app(test_config=None):
             if not relation:
                 abort(404, {
                     'message': 'Relationship with id {} not found in database.'
-                      .format(relationship_id)
+                               .format(relationship_id)
                 })
 
             relation.delete()
@@ -174,7 +174,7 @@ def create_app(test_config=None):
 
     #  Movies Views
     #  ----------------------------------------------------------------
-    @app.route('/movies/', methods=['GET'])
+    @app.route('/movies', methods=['GET'])
     @requires_auth("get:movies")
     def show_movies(token):  # token
         # List all of the movies
@@ -192,7 +192,7 @@ def create_app(test_config=None):
 
     #  Actor Views
     #  ----------------------------------------------------------------
-    @app.route('/actors/', methods=['GET'])
+    @app.route('/actors', methods=['GET'])
     @requires_auth("get:actors")
     def show_actors(token):  # token
         # List all of the actors
@@ -310,7 +310,7 @@ def create_app(test_config=None):
 
             return jsonify({
                 'success': True,
-                'movies' : [new_movie.long()]
+                'movie'  : [new_movie.long()]
             })
         else:
             abort(422)
@@ -386,8 +386,9 @@ def create_app(test_config=None):
             if not relationship:
                 print("No relationships to delete for movie_id:", movie_id)
             else:
-                relationship.delete()
-                print("Deleted relationships for movie_id:", movie_id)
+                for relation in relationship:
+                    relation.delete()
+                    print("Deleted relationships for movie_id:", movie_id)
 
             movie.delete()
             print("Deleted movie: ", movie_id)
@@ -414,23 +415,23 @@ def create_app(test_config=None):
     @app.route('/actors/<int:actor_id>', methods=['PATCH'])
     @requires_auth('patch:actor')
     def patch_actor(token, actor_id):
-        body = request.get_json()
-        name = body.get('name', None)
-        gender = body.get('gender', None)
-        age = body.get('age', None)
-        movies = body.get('movies', None)
+        try:
+            body = request.get_json()
+            name = body.get('name', None)
+            gender = body.get('gender', None)
+            age = body.get('age', None)
+            movies = body.get('movies', None)
 
-        if not body:
-            abort(400, {
-                'message': 'at least one field needs to be changed.'
-            })
-        else:
+            if not name and not age and not gender and not movies:
+                abort(400, {
+                    'message': 'at least one field needs to be changed.'
+                })
+
             print("Data for Update Actor:")
             print(body)
-
-        if not name and not age and not gender and not movies:
+        except():
             abort(400, {
-                'message': 'at least one field needs to be changed.'
+                'message': 'request does not contain a valid JSON body.'
             })
 
         try:
@@ -503,7 +504,7 @@ def create_app(test_config=None):
                 print(updated_actor.long())
                 return jsonify({
                     'success': True,
-                    'actors' : [updated_actor.long()]
+                    'actor'  : [updated_actor.long()]
                 })
             elif not list_of_movies_to_add:
                 abort(400, {
@@ -512,7 +513,7 @@ def create_app(test_config=None):
             else:
                 return jsonify({
                     'success': True,
-                    'actors' : [actor.long()]
+                    'actor'  : [actor.long()]
                 })
         except():
             abort(422)
@@ -521,18 +522,18 @@ def create_app(test_config=None):
     @app.route('/movies/<int:movie_id>', methods=['PATCH'])
     @requires_auth('patch:movie')
     def patch_movie(token, movie_id):
-        body = request.get_json()
-        title = body.get('title', None)
-        release_year = body.get('release_year', None)
-        actors = body.get('actors', None)
+        try:
+            body = request.get_json()
+            title = body.get('title', None)
+            release_year = body.get('release_year', None)
+            actors = body.get('actors', None)
 
-        if not body:
+            print("Data for Update Movie:")
+            print(body)
+        except():
             abort(400, {
                 'message': 'request does not contain a valid JSON body.'
             })
-        else:
-            print("Data for Update Movie:")
-            print(body)
 
         if not title and not release_year:
             abort(400, {
@@ -565,7 +566,7 @@ def create_app(test_config=None):
 
             return jsonify({
                 'success': True,
-                'actors' : [updated_movie.short()]
+                'movie'  : [updated_movie.short()]
             })
         except():
             abort(422)
@@ -627,14 +628,13 @@ def create_app(test_config=None):
             "description": get_error_message(error, "Unauthorized!")
         }), 401
 
-    '''
     @app.errorhandler(500)
     def internal_error(error):
         return jsonify({
             "success": False,
             "error"  : 500,
             "message": get_error_message(error, "Internal Server Error")
-        }), 500'''
+        }), 500
 
     @app.errorhandler(AuthError)
     def authentication_failed(AuthError):

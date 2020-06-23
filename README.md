@@ -156,7 +156,7 @@ Adds movie from JSON values
 `Request response`
 ```json
 {
-    "movies": [
+    "movie": [
         {
             "actors": [],
             "id": 5,
@@ -178,7 +178,7 @@ Modifies movie <id> with JSON values
 `Request response`
 ```json
 {
-    "actors": [
+    "movie": [
         {
             "id": 5,
             "release_year": "2012",
@@ -322,7 +322,7 @@ Modifies actor <id> with JSON values
 `Request response`
 ```json
 {
-    "actors": [
+    "actor": [
         {
             "age": 38,
             "gender": "M",
