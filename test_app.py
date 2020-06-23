@@ -201,7 +201,7 @@ class AgencyTestCase(unittest.TestCase):
                                   headers=executive_producer_auth_header)
         data = json.loads(res.data)
 
-        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.status_code, 400)
         self.assertFalse(data['success'])
         self.assertEqual(
             data['message'], 'request does not contain a valid JSON body.')
@@ -351,14 +351,14 @@ class AgencyTestCase(unittest.TestCase):
 
     def test_error_400_edit_movie(self):
         """Test PATCH with non valid id json body"""
-        res = self.client().patch('/movies/2', json={},
+        res = self.client().patch('/movies/2',
                                   headers=executive_producer_auth_header)
         data = json.loads(res.data)
 
         self.assertEqual(res.status_code, 400)
         self.assertFalse(data['success'])
         self.assertEqual(
-            data['message'], 'at least one field needs to be changed.')
+            data['message'], 'request does not contain a valid JSON body.')
 
     def test_error_404_edit_movie(self):
         """Test PATCH with non valid id"""

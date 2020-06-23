@@ -415,7 +415,7 @@ def create_app(test_config=None):
     @app.route('/actors/<int:actor_id>', methods=['PATCH'])
     @requires_auth('patch:actor')
     def patch_actor(token, actor_id):
-        try:
+        if request.data:
             body = request.get_json()
             name = body.get('name', None)
             gender = body.get('gender', None)
@@ -429,100 +429,100 @@ def create_app(test_config=None):
 
             print("Data for Update Actor:")
             print(body)
-        except():
+
+            try:
+                actor = Actor.query.filter_by(id=actor_id).one_or_none()
+                if not actor:
+                    abort(404, {
+                        'message': 'Actor with id {} not found in '
+                                   'database.'.format(actor_id)
+                    })
+                else:
+                    print("Update For Actor:", actor_id)
+                    print(actor.short())
+
+                if name is not None:
+                    actor.name = name
+
+                if gender is not None:
+                    actor.gender = gender
+
+                if age is not None:
+                    actor.age = age
+
+                # Handling movie relationships
+                list_of_movies = []
+                list_of_movies_to_add = []
+                already_exist_movies = []
+                if movies:
+                    # We check existing relationship between actor and movie(s)
+                    already_related_movies = Related.query.filter_by(
+                        actor_id=actor_id).all()
+                    # Iterate through movie_ids in already_related_movies and
+                    # save to array
+                    for related_movie in already_related_movies:
+                        already_exist_movies.append(related_movie.movie_id)
+
+                    print("Already Exists - Relationship already exists:",
+                          already_exist_movies)
+                    # Check difference of movies to add vs already existing
+                    list_of_movies_to_add = diff(movies, already_exist_movies)
+                    print("Difference of already-exists-movies and movies is:",
+                          list_of_movies_to_add)
+
+                    if not list_of_movies_to_add:
+                        print("No movies to update")
+                    else:
+                        for movie in list_of_movies_to_add:
+                            movie_data = Movie.query.filter_by(
+                                id=movie).one_or_none()
+                            if not movie_data:
+                                abort(422, {
+                                    'message': 'movie {} not found'.format(
+                                        movie)
+                                })
+
+                            # add this movie to list_of_movies
+                            list_of_movies.append(movie_data.short())
+
+                            # Add relationship to Related table
+                            relation = Related(movie_id=movie_data.id,
+                                               actor_id=actor_id)
+                            relation.insert()
+
+                            print("New Relation")
+                            print(relation.format())
+                            print("List of movies", list_of_movies)
+
+                if age or gender or name is not None:
+                    Actor.update(actor)
+                    updated_actor = Actor.query.filter_by(id=actor_id).first()
+                    print(updated_actor.long())
+                    return jsonify({
+                        'success': True,
+                        'actor'  : [updated_actor.long()]
+                    })
+                elif not list_of_movies_to_add:
+                    abort(400, {
+                        'message': 'at least one field needs to be changed.'
+                    })
+                else:
+                    return jsonify({
+                        'success': True,
+                        'actor'  : [actor.long()]
+                    })
+            except():
+                abort(422)
+        else:
             abort(400, {
                 'message': 'request does not contain a valid JSON body.'
             })
-
-        try:
-            actor = Actor.query.filter_by(id=actor_id).one_or_none()
-            if not actor:
-                abort(404, {
-                    'message': 'Actor with id {} not found in '
-                               'database.'.format(actor_id)
-                })
-            else:
-                print("Update For Actor:", actor_id)
-                print(actor.short())
-
-            if name is not None:
-                actor.name = name
-
-            if gender is not None:
-                actor.gender = gender
-
-            if age is not None:
-                actor.age = age
-
-            # Handling movie relationships
-            list_of_movies = []
-            list_of_movies_to_add = []
-            already_exist_movies = []
-            if movies:
-                # We check existing relationship between actor and the movie(s)
-                already_related_movies = Related.query.filter_by(
-                    actor_id=actor_id).all()
-                # Iterate through movie_ids in already_related_movies and
-                # save to array
-                for related_movie in already_related_movies:
-                    already_exist_movies.append(related_movie.movie_id)
-
-                print("Already Exists movies - Relationship already exists:",
-                      already_exist_movies)
-                # Check difference of movies to add vs already existing
-                list_of_movies_to_add = diff(movies, already_exist_movies)
-                print("Difference of already-exists-movies and movies is:",
-                      list_of_movies_to_add)
-
-                if not list_of_movies_to_add:
-                    print("No movies to update")
-                else:
-                    for movie in list_of_movies_to_add:
-                        movie_data = Movie.query.filter_by(
-                            id=movie).one_or_none()
-                        if not movie_data:
-                            abort(422, {
-                                'message': 'movie {} not found'.format(
-                                    movie)
-                            })
-
-                        # add this movie to list_of_movies
-                        list_of_movies.append(movie_data.short())
-
-                        # Add relationship to Related table
-                        relation = Related(movie_id=movie_data.id,
-                                           actor_id=actor_id)
-                        relation.insert()
-
-                        print("New Relation")
-                        print(relation.format())
-                        print("List of movies", list_of_movies)
-
-            if age or gender or name is not None:
-                Actor.update(actor)
-                updated_actor = Actor.query.filter_by(id=actor_id).first()
-                print(updated_actor.long())
-                return jsonify({
-                    'success': True,
-                    'actor'  : [updated_actor.long()]
-                })
-            elif not list_of_movies_to_add:
-                abort(400, {
-                    'message': 'at least one field needs to be changed.'
-                })
-            else:
-                return jsonify({
-                    'success': True,
-                    'actor'  : [actor.long()]
-                })
-        except():
-            abort(422)
 
     # PATCH MODIFY Movie
     @app.route('/movies/<int:movie_id>', methods=['PATCH'])
     @requires_auth('patch:movie')
     def patch_movie(token, movie_id):
-        try:
+        if request.data:
             body = request.get_json()
             title = body.get('title', None)
             release_year = body.get('release_year', None)
@@ -530,46 +530,46 @@ def create_app(test_config=None):
 
             print("Data for Update Movie:")
             print(body)
-        except():
+
+            if not title and not release_year:
+                abort(400, {
+                    'message': 'at least one field needs to be changed.'
+                })
+
+            try:
+                movie = Movie.query.filter_by(id=movie_id).one_or_none()
+                if not movie:
+                    abort(404, {
+                        'message': 'Movie with id {} not found in '
+                                   'database.'
+                          .format(movie_id)
+                    })
+
+                if title is not None:
+                    movie.title = title
+
+                if release_year is not None:
+                    movie.release_year = release_year
+
+                # TODO: Add ability to modify actors featuring in by movie_id
+                # if actors is not None:
+                #     movie.actors = actors
+
+                print(movie.format())
+                Movie.update(movie)
+
+                updated_movie = Movie.query.filter_by(id=movie_id).first()
+
+                return jsonify({
+                    'success': True,
+                    'movie'  : [updated_movie.short()]
+                })
+            except():
+                abort(422)
+        else:
             abort(400, {
                 'message': 'request does not contain a valid JSON body.'
             })
-
-        if not title and not release_year:
-            abort(400, {
-                'message': 'at least one field needs to be changed.'
-            })
-
-        try:
-            movie = Movie.query.filter_by(id=movie_id).one_or_none()
-            if not movie:
-                abort(404, {
-                    'message': 'Movie with id {} not found in '
-                               'database.'
-                      .format(movie_id)
-                })
-
-            if title is not None:
-                movie.title = title
-
-            if release_year is not None:
-                movie.release_year = release_year
-
-            # TODO: Add ability to modify actors featuring in by movie_id
-            # if actors is not None:
-            #     movie.actors = actors
-
-            print(movie.format())
-            Movie.update(movie)
-
-            updated_movie = Movie.query.filter_by(id=movie_id).first()
-
-            return jsonify({
-                'success': True,
-                'movie'  : [updated_movie.short()]
-            })
-        except():
-            abort(422)
 
     @app.route('/coolkids')
     def be_cool():
